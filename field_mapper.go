@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type DBFielder interface {
+type Fielder interface {
 	FieldForName(name string) interface{}
 }
 
@@ -25,7 +25,7 @@ func (r *FieldsMapper) ColumnString() string {
 	return strings.Join(r.Columns(), ", ")
 }
 
-func (r *FieldsMapper) Fields(fielder DBFielder) []interface{} {
+func (r *FieldsMapper) Fields(fielder Fielder) []interface{} {
 	fields := make([]interface{}, len(r.fieldNames))
 	for i, fieldName := range r.fieldNames {
 		fields[i] = fielder.FieldForName(fieldName)
@@ -34,7 +34,7 @@ func (r *FieldsMapper) Fields(fielder DBFielder) []interface{} {
 	return fields
 }
 
-func (r *FieldsMapper) MapFields(fielders []DBFielder) []interface{} {
+func (r *FieldsMapper) MapFields(fielders []Fielder) []interface{} {
 	result := []interface{} {}
 	for _, fielder := range fielders {
 		result = append(result, r.Fields(fielder)...)
@@ -66,7 +66,7 @@ func (r *FieldsMapper) ValuesPlaceholder(count int) string {
 	return valueString.String()
 }
 
-func (r *FieldsMapper) PackDict(fielder DBFielder) map[string]interface{} {
+func (r *FieldsMapper) PackDict(fielder Fielder) map[string]interface{} {
 	result := map[string]interface{}{}
 
 	for _, fieldName := range r.fieldNames {
@@ -74,4 +74,10 @@ func (r *FieldsMapper) PackDict(fielder DBFielder) map[string]interface{} {
 	}
 
 	return result
+}
+
+type FielderMap map[string]interface{}
+
+func (r *FielderMap) FieldForName(name string) interface{} {
+	return map[string]interface{}(*r)[name]
 }

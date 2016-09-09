@@ -25,13 +25,13 @@ func (t *TestFielder) FieldForName(name string) interface{} {
 func TestQueryBuilder(t *testing.T) {
 	{
 		sql, arguments := Build(Exp(
-			"SELECT abc, def FROM what WHERE",
-			Not(
+			"SELECT abc, def FROM what",
+			"WHERE", Not(
 				And(
 					Exp("user_id >", P(12345)),
 					And(
 						Exp("media_id <", 12345),
-						Exp("time_uuid", "=", 12345),
+						Exp("time_uuid =", 12345),
 					),
 				),
 			),
@@ -43,19 +43,14 @@ func TestQueryBuilder(t *testing.T) {
 
 	{
 		mapper := NewFieldsMapper([]string{"field1", "field2"})
-		values := []DBFielder {
+		values := []Fielder{
 			&TestFielder{"1","2"},
 			&TestFielder{"3","4"},
 		}
 		sql, arguments := Build(
 			Exp(
 				"INSERT INTO table2 (", mapper.ColumnString(), ") VALUES ",
-				Join(",",
-					Exp("(", P(mapper.Fields(values[0])...), ")"),
-					Exp("(", P(mapper.Fields(values[0])...), ")"),
-					Exp("(", P(mapper.Fields(values[0])...), ")"),
-					Exp("(", P(mapper.Fields(values[0])...), ")"),
-				),
+				"(", Join(",", mapper.Fields(values[0])), ")",
 			),
 		)
 
@@ -66,16 +61,72 @@ func TestQueryBuilder(t *testing.T) {
 	{
 		i := 30
 		sql, arguments := Build(
-			Exp("UPDATE table2 SET ",
-			    "a =", P("300"), ",",
-			    "b =", P("300"), ",",
-			    "c =", P("300"), ",",
-			    "d =", P(i),
-			    "WHERE a = ", P(300),
-			),
+			"UPDATE table2 SET ",
+			"a =", P("300"), ",",
+			"b =", P("300"), ",",
+			"c =", P("300"), ",",
+			"d =", V(i),
+			"WHERE a = ", P(300),
 		)
 
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
+	}
+
+	{
+		table := "tablename"
+		sql, arguments := Build(
+			"DELETE FROM", table,
+			"WHERE abc = ", 1,
+		)
+
+		fmt.Println(sql)
+		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
+	}
+
+	{
+
+		// SELECT * FROM table
+		// WHERE abc = 1 AND bcd = 2 AND (abc = 1  AND def >=  ?)
+
+		sql, arguments := Build(Exp(
+			"SELECT * FROM table",
+			"WHERE abc =", 1, "AND", "bcd =", 2, "AND",
+			And(
+				Exp("abc", "=", "1"),
+				Exp("def", ">=", P(3000)),
+				G(
+					G("abc =", 123), "AND", G("bce =", 345),
+				),
+			),
+		))
+
+		fmt.Println(sql)
+		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
+	}
+}
+
+func BenchmarkExp(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		Build(Exp(
+			"SELECT abc, def FROM what",
+			"WHERE", Not(
+				And(
+					Exp("user_id >", P(12345)),
+					And(
+						Exp("media_id", "<", 12345),
+						Exp("time_uuid", "=", 12345),
+					),
+				),
+			),
+		))
+	}
+}
+
+func BenchmarkSimple(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		Build(Exp(
+			"SELECT abc, def FROM what",
+		))
 	}
 }

@@ -3,7 +3,6 @@ package sqlm
 import (
 	"strings"
 	"fmt"
-	"github.com/mailru/easyjson/buffer"
 	"bytes"
 )
 
@@ -16,22 +15,11 @@ type Raw struct {
 	arguments []interface{}
 }
 
-func (s *Raw) Sql() (string, []interface{}) {
+func (s Raw) Sql() (string, []interface{}) {
 	return s.value, s.arguments
 }
 
-func Values(mapper *FieldsMapper, fielders []DBFielder) Expression {
-	return &Raw {
-		value: fmt.Sprintf(
-			"(%s) VALUES %s",
-			mapper.ColumnString(),
-			mapper.ValuesPlaceholder(len(fielders)),
-		),
-		arguments: mapper.MapFields(fielders),
-	}
-}
-
-func SetMapper(mapper *FieldsMapper, fielder DBFielder) Expression {
+func SetMapper(mapper *FieldsMapper, fielder Fielder) Expression {
 	columns := mapper.Columns()
 	fields := mapper.Fields(fielder)
 
@@ -44,33 +32,25 @@ func SetMapper(mapper *FieldsMapper, fielder DBFielder) Expression {
 		}
 	}
 
-	return &Raw {
+	return Raw {
 		value: fmt.Sprintf("SET %s", string(buf.String())),
 		arguments: fields,
 	}
 }
 
-func Set(expressions ...Expression) Expression {
-	return Joiner {
-		expressions: expressions,
-		sep: ",",
-		prefix: "SET ",
-	}
-}
-
-type Joiner struct {
-	expressions []Expression
+type joiner struct {
+	expressions []interface{}
 	sep string
 	prefix string
 	suffix string
 }
 
-func (s Joiner) Sql() (string, []interface{}) {
+func (s joiner) Sql() (string, []interface{}) {
 	sql := []string{}
 	arguments := []interface{}{}
 	for _, exp := range s.expressions {
 		if exp != nil {
-			expSql, expArgs := exp.Sql()
+			expSql, expArgs := Exp(exp).Sql()
 			sql = append(sql, expSql)
 			arguments = append(arguments, expArgs...)
 		}
@@ -79,8 +59,12 @@ func (s Joiner) Sql() (string, []interface{}) {
 	return s.prefix + strings.Join(sql, s.sep) + s.suffix, arguments
 }
 
-func And(expressions ...Expression) Expression {
-	return Joiner {
+func G(components ...interface{}) Expression {
+	return Exp("(", components, ")")
+}
+
+func And(expressions ...interface{}) Expression {
+	return joiner{
 		expressions: expressions,
 		sep: " AND ",
 		prefix: "(",
@@ -88,8 +72,8 @@ func And(expressions ...Expression) Expression {
 	}
 }
 
-func Or(filters ...Expression) Expression {
-	return Joiner{
+func Or(filters ...interface{}) Expression {
+	return joiner{
 		expressions: filters,
 		sep: " OR ",
 		prefix: "(",
@@ -97,38 +81,41 @@ func Or(filters ...Expression) Expression {
 	}
 }
 
-func Not(exp Expression) Expression {
-	return Joiner {
-		expressions: []Expression {exp},
-		prefix: "NOT (",
-		suffix: ")",
-	}
+func Not(exp interface{}) Expression {
+	return Exp("NOT", exp)
 }
 
-func Join(sep string, expressions ...Expression) Expression {
-	return Joiner {
-		expressions: expressions,
+func flat(expressions ...interface{}) []interface{} {
+	result := []interface{}{}
+	for _, e := range expressions {
+		switch t := e.(type) {
+		case []interface{}:
+			result = append(result, flat(t...)...)
+		default:
+			result = append(result, t)
+		}
+	}
+
+	return result
+}
+
+func Join(sep string, expressions ...interface{}) Expression {
+	return joiner{
+		expressions: flat(expressions),
 		sep: sep,
 	}
 }
 
-func Build(expressions ...Expression) (string, []interface{}) {
-	return Joiner {
-		expressions: expressions,
-		sep: " ",
-	}.Sql()
+func Build(expressions ...interface{}) (string, []interface{}) {
+	return Exp(expressions).Sql()
 }
 
 type Param struct{
 	inner interface{}
 }
 
-func P(values ...interface{}) []Param {
-	result := make([]Param, 0, len(values))
-	for i := 0; i < len(values); i++ {
-		result = append(result, Param{inner: values[i]})
-	}
-	return result
+func P(value interface{}) Param {
+	return Param{inner: value}
 }
 
 type Value struct {
@@ -146,58 +133,77 @@ func V(values ...interface{}) []Value {
 func Exp(components ...interface{}) Expression {
 	// If the component is param then we wrap it
 	// Otherwise, we just append it to sql expression
-	buf := buffer.Buffer{}
+	buf := bytes.Buffer{}
 	arguments := []interface{}{}
 	for _, c := range components {
-		if params, ok := c.([]Param); ok {
-			for index, p := range params {
-				if index < len(params) - 1 {
-					buf.AppendString("?, ")
-				} else {
-					buf.AppendString(" ?")
-				}
-
-				arguments = append(arguments, p.inner)
-			}
-		} else if p, ok := c.(Param); ok {
-			buf.AppendString(" ? ")
+		if p, ok := c.(Param); ok {
+			buf.WriteString(" ? ")
 			arguments = append(arguments, p.inner)
 		} else if values, ok := c.([]Value); ok {
 			for index, v := range values {
 				if index < len(values) - 1 {
-					buf.AppendString(fmt.Sprintf("%v, ", v.inner))
+					buf.WriteString(fmt.Sprintf("%v, ", deRef(v.inner)))
 				} else {
-					buf.AppendString(fmt.Sprintf(" %v", v.inner))
+					buf.WriteString(fmt.Sprintf(" %v", deRef(v.inner)))
 				}
 			}
-		} else if v, ok := c.(Value); ok {
-			buf.AppendString(fmt.Sprintf(" %v ", v.inner))
 		} else if p, ok := c.(Expression); ok {
 			sql, args := p.Sql()
-			buf.AppendString(sql + " ")
+			buf.WriteString(sql)
+			buf.WriteRune(' ')
 			arguments = append(arguments, args...)
 		} else if expressions, ok := c.([]Expression); ok {
 			for index, exp := range expressions {
 				sql, args := exp.Sql()
 				if index < len(values) - 1 {
-					buf.AppendString(fmt.Sprintf("%v ", sql))
+					buf.WriteString(fmt.Sprintf("%v ", sql))
 				} else {
-					buf.AppendString(fmt.Sprintf(" %v", sql))
+					buf.WriteString(fmt.Sprintf(" %v", sql))
 				}
 				arguments = append(arguments, args...)
 			}
+		} else if slice, ok := c.([]interface{}); ok {
+			sql, args := Exp(slice...).Sql()
+			fmt.Printf("slicing %v: %s\n", slice, sql)
+
+			buf.WriteString(sql)
+			arguments = append(arguments, args...)
 		} else {
 			if s, ok := c.(string); ok {
-				buf.AppendString(s + " ")
+				buf.WriteString(" " + s + " ")
 			} else {
-				buf.AppendString(fmt.Sprintf("%v ", c))
+				buf.WriteString(fmt.Sprintf(" %v ", deRef(c)))
 			}
 		}
 	}
 
-	return &Raw {
-		value: string(buf.BuildBytes()),
+	return Raw {
+		value: string(buf.Bytes()),
 		arguments: arguments,
 	}
 }
 
+func deRef(i interface{}) interface{} {
+	switch t := i.(type) {
+	case *string:
+		return *t
+	case *int:
+		return *t
+	case *int8:
+		return *t
+	case *int16:
+		return *t
+	case *int32:
+		return *t
+	case *int64:
+		return *t
+	case *float32:
+		return *t
+	case *float64:
+		return *t
+	case *interface{}:
+		return *t
+	default:
+		return t
+	}
+}
