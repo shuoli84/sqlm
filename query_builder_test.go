@@ -61,12 +61,12 @@ func TestQueryBuilder(t *testing.T) {
 	{
 		i := 30
 		sql, arguments := Build(
-			"UPDATE table2 SET ",
+			"UPDATE table2 SET",
 			"a =", P("300"), ",",
-			"b =", P("300"), ",",
-			"c =", P("300"), ",",
+			"b =", P("400"), ",",
+			"c =", P("500"), ",",
 			"d =", V(i),
-			"WHERE a = ", P(300),
+			"WHERE a =", P(300),
 		)
 
 		fmt.Println(sql)
@@ -108,7 +108,7 @@ func TestQueryBuilder(t *testing.T) {
 
 func BenchmarkExp(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		Build(Exp(
+		Build(
 			"SELECT abc, def FROM what",
 			"WHERE", Not(
 				And(
@@ -119,7 +119,7 @@ func BenchmarkExp(b *testing.B) {
 					),
 				),
 			),
-		))
+		)
 	}
 }
 

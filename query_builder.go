@@ -66,7 +66,7 @@ func G(components ...interface{}) Expression {
 func And(expressions ...interface{}) Expression {
 	return joiner{
 		expressions: expressions,
-		sep: " AND ",
+		sep: " AND",
 		prefix: "(",
 		suffix: ")",
 	}
@@ -75,7 +75,7 @@ func And(expressions ...interface{}) Expression {
 func Or(filters ...interface{}) Expression {
 	return joiner{
 		expressions: filters,
-		sep: " OR ",
+		sep: " OR",
 		prefix: "(",
 		suffix: ")",
 	}
@@ -122,12 +122,8 @@ type Value struct {
 	inner interface{}
 }
 
-func V(values ...interface{}) []Value {
-	result := make([]Value, 0, len(values))
-	for i := 0; i < len(values); i++ {
-		result = append(result, Value{inner: values[i]})
-	}
-	return result
+func V(v interface{}) Value {
+	return Value{inner: v}
 }
 
 func Exp(components ...interface{}) Expression {
@@ -135,44 +131,21 @@ func Exp(components ...interface{}) Expression {
 	// Otherwise, we just append it to sql expression
 	buf := bytes.Buffer{}
 	arguments := []interface{}{}
-	for _, c := range components {
+	for _, c := range flat(components) {
 		if p, ok := c.(Param); ok {
-			buf.WriteString(" ? ")
+			buf.WriteString(" ?")
 			arguments = append(arguments, p.inner)
-		} else if values, ok := c.([]Value); ok {
-			for index, v := range values {
-				if index < len(values) - 1 {
-					buf.WriteString(fmt.Sprintf("%v, ", deRef(v.inner)))
-				} else {
-					buf.WriteString(fmt.Sprintf(" %v", deRef(v.inner)))
-				}
-			}
+		} else if v, ok := c.(Value); ok {
+			buf.WriteString(fmt.Sprintf(" %v", deRef(v.inner)))
 		} else if p, ok := c.(Expression); ok {
 			sql, args := p.Sql()
-			buf.WriteString(sql)
-			buf.WriteRune(' ')
-			arguments = append(arguments, args...)
-		} else if expressions, ok := c.([]Expression); ok {
-			for index, exp := range expressions {
-				sql, args := exp.Sql()
-				if index < len(values) - 1 {
-					buf.WriteString(fmt.Sprintf("%v ", sql))
-				} else {
-					buf.WriteString(fmt.Sprintf(" %v", sql))
-				}
-				arguments = append(arguments, args...)
-			}
-		} else if slice, ok := c.([]interface{}); ok {
-			sql, args := Exp(slice...).Sql()
-			fmt.Printf("slicing %v: %s\n", slice, sql)
-
-			buf.WriteString(sql)
+			buf.WriteString(" " + sql)
 			arguments = append(arguments, args...)
 		} else {
 			if s, ok := c.(string); ok {
-				buf.WriteString(" " + s + " ")
+				buf.WriteString(" " + s)
 			} else {
-				buf.WriteString(fmt.Sprintf(" %v ", deRef(c)))
+				buf.WriteString(fmt.Sprintf(" %v", deRef(c)))
 			}
 		}
 	}
