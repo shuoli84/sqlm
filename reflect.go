@@ -1,6 +1,5 @@
 package sqlm
 
-
 func deRef(i interface{}) interface{} {
 	switch t := i.(type) {
 	case *string:

@@ -3,7 +3,6 @@ package sqlm
 import (
 	"strings"
 	"fmt"
-	"bytes"
 )
 
 // Any thing can be converted to a sql and its arguments is an expression
@@ -28,17 +27,17 @@ func NewRaw(sql string, arguments ...interface{}) Raw {
 // formatter is a generic helper, which provide the way to join several expressions
 // together.
 type formatter struct {
-	components []interface{}
-	sep        string
-	prefix     string
-	suffix     string
+	expressions []Expression
+	sep         string
+	prefix      string
+	suffix      string
 }
 
 func (s formatter) ToSql() (string, []interface{}) {
-	sql := make([]string, len(s.components))
-	arguments := make([]interface{}, 0, len(s.components))
-	for i, component := range s.components {
-		expSql, expArgs := Exp(component).ToSql()
+	sql := make([]string, len(s.expressions))
+	arguments := make([]interface{}, 0, len(s.expressions))
+	for i, expression := range s.expressions {
+		expSql, expArgs := expression.ToSql()
 		sql[i] = expSql
 		arguments = append(arguments, expArgs...)
 	}
@@ -46,80 +45,41 @@ func (s formatter) ToSql() (string, []interface{}) {
 	return s.prefix + strings.Join(sql, s.sep) + s.suffix, arguments
 }
 
-// node holds several expressions and join them one by one
-type node struct {
-	expressions []Expression
-}
-
-func (r node) ToSql() (string, []interface{}) {
-	buf := bytes.Buffer{}
-	arguments := []interface{}{}
-
-	for _, e := range r.expressions {
-		var expSql string
-		var expArgs []interface{}
-
-		expSql, expArgs = e.ToSql()
-
-		buf.WriteString(" " + expSql)
-		arguments = append(arguments, expArgs...)
-	}
-
-	return buf.String(), arguments
-}
-
 func G(components ...interface{}) Expression {
-	return formatter{
-		components: components,
-		prefix: "(",
-		suffix: ")",
-	}
+	return Format("(1 2)", components...)
 }
 
-func And(expressions ...interface{}) Expression {
-	return formatter{
-		components: expressions,
-		sep: " AND",
-		prefix: "(",
-		suffix: ")",
-	}
+func And(components ...interface{}) Expression {
+	return Format("(1 AND 2)", components...)
 }
 
-func Or(filters ...interface{}) Expression {
-	return formatter{
-		components: filters,
-		sep: " OR",
-		prefix: "(",
-		suffix: ")",
-	}
+func Or(components ...interface{}) Expression {
+	return Format("(1 OR 2)", components...)
 }
 
 func Not(exp interface{}) Expression {
-	return formatter{
-		components: []interface{}{exp},
-		prefix: "NOT",
-	}
+	return Format("NOT 12", exp)
 }
 
 
-// sep format
-// (,)  (1,2,3,4)
-// , 1,2,3,4
+// sep format, like dateformatter, we use magic numbers to split
+// (1,2) => prefix:( sep:, suffix:)
+// 1,2  => prefix: sep:, suffix:
 // If the sep has three letters, then the first is prefix, last is suffix and middle is the sep
 
 func Format(sepFormat string, expressions ...interface{}) Expression {
 	var prefix, sep, suffix string
 
-	if len(sepFormat) == 3 {
-		components := strings.Split(sepFormat, "")
-		prefix, sep, suffix = components[0], components[1], components[2]
-	} else {
-		sep = sepFormat
-	}
+	components := strings.Split(sepFormat, "1")
+	prefix = components[0]
+
+	secondHalfComponents := strings.Split(components[1], "2")
+	sep = secondHalfComponents[0]
+	suffix = secondHalfComponents[1]
 
 	return formatter{
 		// When expression passed in as [[1,2,3]], we prefer it converts to [1,2,3]
-		components: flat(expressions),
+		expressions: componentsToExpressions(expressions),
 		prefix: prefix,
 		sep: sep,
 		suffix: suffix,
@@ -138,56 +98,33 @@ func P(value interface{}) Param {
 	return Param{inner: value}
 }
 
-type value struct {
-	inner interface{}
-}
-
-func V(v interface{}) value {
-	return value{inner: v}
-}
-
 func Exp(components ...interface{}) Expression {
+	return Format("1 2", components)
+}
+
+func componentsToExpressions(components []interface{}) []Expression {
 	expressions := []Expression{}
 	components = flat(components)
-
-	toBeMerged := []string{}
-	shouldDoMerge := false
 
 	for i := 0; i < len(components); i++ {
 		c := components[i]
 
 		var exp Expression
 		switch v := c.(type) {
-		case Param:
-			exp = NewRaw("?", v.inner)
-			shouldDoMerge = true
-		case value:
-			toBeMerged = append(toBeMerged, fmt.Sprintf("%v", deRef(v.inner)))
 		case Expression:
 			exp = v
-			shouldDoMerge = true
+		case Param:
+			exp = NewRaw("?", v.inner)
 		case string:
-			toBeMerged = append(toBeMerged, v)
-			shouldDoMerge = false
+			exp = NewRaw(v)
 		default:
-			toBeMerged = append(toBeMerged, fmt.Sprintf("%v", deRef(v)))
-			shouldDoMerge = false
-		}
-
-		if shouldDoMerge {
-			expressions = append(expressions, NewRaw(strings.Join(toBeMerged, " ")))
-			toBeMerged = []string{}
-			shouldDoMerge = false
+			exp = NewRaw(fmt.Sprintf("%v", deRef(v)))
 		}
 
 		if exp != nil {
 			expressions = append(expressions, exp)
 		}
 	}
-	if len(toBeMerged) > 0 {
-		expressions = append(expressions, NewRaw(strings.Join(toBeMerged, " ")))
-	}
 
-	return node{expressions: expressions}
+	return expressions
 }
-
