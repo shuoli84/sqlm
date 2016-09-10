@@ -49,7 +49,7 @@ func TestQueryBuilder(t *testing.T) {
 		i := 30
 		sql, arguments := Build(
 			"UPDATE table2 SET",
-			Format("1, \n2",
+			F("1, \n2",
 				Exp("a =", P("300")),
 				Exp("b =", P("400")),
 				Exp("c =", P("500")),
@@ -81,10 +81,10 @@ func TestQueryBuilder(t *testing.T) {
 		sql, arguments := Build(
 			"SELECT * FROM table",
 			"WHERE abc =", 1, "AND", "bcd =", 2, "AND",
-			Format("(1 AND 2)",
+			F("(1 AND 2)",
 				Exp("abc", "=", "1"),
 				Exp("def", ">=", P(3000)),
-				Format("(1 2)",
+				F("(1 2)",
 					G("abc =", 123), "AND", G("bce =", 345),
 				),
 			),
@@ -98,11 +98,11 @@ func TestQueryBuilder(t *testing.T) {
 func TestJoin(t *testing.T) {
 	sql, args := Build(
 		"INSERT INTO table (a, b, c) VALUES",
-		Format("1, 2",
-			Format("(1 ,2)", 1, 2, 3),
-			Format("(1 ,2)", 4, 5, 6),
-			Format("(1 ,2)", 7, 8, 9),
-			Format("(1 ,2)", 10, P(11), 12),
+		F("1, 2",
+			F("(1 ,2)", 1, 2, 3),
+			F("(1 ,2)", 4, 5, 6),
+			F("(1 ,2)", 7, 8, 9),
+			F("(1 ,2)", 10, P(11), 12),
 		),
 	)
 

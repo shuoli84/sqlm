@@ -46,28 +46,27 @@ func (s formatter) ToSql() (string, []interface{}) {
 }
 
 func G(components ...interface{}) Expression {
-	return Format("(1 2)", components...)
+	return F("(1 2)", components...)
 }
 
 func And(components ...interface{}) Expression {
-	return Format("(1 AND 2)", components...)
+	return F("(1 AND 2)", components...)
 }
 
 func Or(components ...interface{}) Expression {
-	return Format("(1 OR 2)", components...)
+	return F("(1 OR 2)", components...)
 }
 
 func Not(exp interface{}) Expression {
-	return Format("NOT 12", exp)
+	return F("NOT 12", exp)
 }
-
 
 // sep format, like dateformatter, we use magic numbers to split
 // (1,2) => prefix:( sep:, suffix:)
 // 1,2  => prefix: sep:, suffix:
 // If the sep has three letters, then the first is prefix, last is suffix and middle is the sep
 
-func Format(sepFormat string, expressions ...interface{}) Expression {
+func F(sepFormat string, expressions ...interface{}) Expression {
 	var prefix, sep, suffix string
 
 	components := strings.Split(sepFormat, "1")
@@ -99,7 +98,7 @@ func P(value interface{}) Param {
 }
 
 func Exp(components ...interface{}) Expression {
-	return Format("1 2", components)
+	return F("1 2", components)
 }
 
 func componentsToExpressions(components []interface{}) []Expression {
