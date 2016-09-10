@@ -7,7 +7,7 @@ import (
 )
 
 type Expression interface {
-	Sql() (string, []interface{})
+	Sql(context interface{}) (string, []interface{})
 }
 
 type Raw struct {
@@ -15,7 +15,7 @@ type Raw struct {
 	arguments []interface{}
 }
 
-func (s Raw) Sql() (string, []interface{}) {
+func (s Raw) Sql(context interface{}) (string, []interface{}) {
 	return s.sql, s.arguments
 }
 
@@ -30,12 +30,12 @@ type joiner struct {
 	suffix string
 }
 
-func (s joiner) Sql() (string, []interface{}) {
+func (s joiner) Sql(context interface{}) (string, []interface{}) {
 	sql := []string{}
 	arguments := []interface{}{}
 	for _, exp := range s.expressions {
 		if exp != nil {
-			expSql, expArgs := Exp(exp).Sql()
+			expSql, expArgs := Exp(exp).Sql(context)
 			sql = append(sql, expSql)
 			arguments = append(arguments, expArgs...)
 		}
@@ -48,36 +48,23 @@ type node struct {
 	expressions []Expression
 }
 
-func (r node) Sql() (string, []interface{}) {
+func (r node) Sql(context interface{}) (string, []interface{}) {
 	buf := bytes.Buffer{}
 	arguments := []interface{}{}
 
 	for _, e := range r.expressions {
-		expSql, expArgs := e.Sql()
+		var expSql string
+		var expArgs []interface{}
+
+		// If we have a context by our self, then we pass it down
+		// Otherwise, pass the passed in context down
+		expSql, expArgs = e.Sql(context)
+
 		buf.WriteString(" " + expSql)
 		arguments = append(arguments, expArgs...)
 	}
 
 	return buf.String(), arguments
-}
-
-func SetMapper(mapper *FieldsMapper, fielder Fielder) Expression {
-	columns := mapper.Columns()
-	fields := mapper.Fields(fielder)
-
-	buf := bytes.Buffer{}
-	for i := 0; i < len(columns); i++ {
-		if i < len(columns) - 1 {
-			buf.WriteString(fmt.Sprintf("%s = ?,", columns[i]))
-		} else {
-			buf.WriteString(fmt.Sprintf("%s = ?", columns[i]))
-		}
-	}
-
-	return Raw {
-		sql: fmt.Sprintf("SET %s", string(buf.String())),
-		arguments: fields,
-	}
 }
 
 func G(components ...interface{}) Expression {
@@ -129,7 +116,7 @@ func Join(sep string, expressions ...interface{}) Expression {
 }
 
 func Build(expressions ...interface{}) (string, []interface{}) {
-	return Exp(expressions).Sql()
+	return Exp(expressions).Sql(nil)
 }
 
 type Param struct{
