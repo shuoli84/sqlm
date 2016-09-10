@@ -35,7 +35,7 @@ func TestQueryBuilder(t *testing.T) {
 					),
 				),
 			),
-		).Sql(nil)
+		).ToSql()
 
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
@@ -61,7 +61,7 @@ func TestQueryBuilder(t *testing.T) {
 		sql, arguments := Exp(
 			"DELETE FROM", table,
 			"WHERE abc =", 1,
-		).Sql(nil)
+		).ToSql()
 
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
@@ -87,6 +87,21 @@ func TestQueryBuilder(t *testing.T) {
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
 	}
+}
+
+func TestJoin(t *testing.T) {
+	sql, args := Build(
+		"INSERT INTO table (a, b, c) VALUES",
+		Format(",",
+			Format("(,)", 1, 2, 3),
+			Format("(,)", 4, 5, 6),
+			Format("(,)", 7, 8, 9),
+			Format("(,)", 10, P(11), 12),
+		),
+	)
+
+	fmt.Println(sql)
+	fmt.Printf("len: %d, %v\n", len(args), args)
 }
 
 func BenchmarkExp(b *testing.B) {
@@ -119,14 +134,14 @@ func BenchmarkNode(b *testing.B) {
 					),
 				),
 			),
-		).Sql(nil)
+		).ToSql()
 	}
 }
 
 func BenchmarkSimple(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		Build(Exp(
+		Build(
 			"SELECT abc, def FROM what",
-		))
+		)
 	}
 }

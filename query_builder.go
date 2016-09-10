@@ -6,49 +6,52 @@ import (
 	"bytes"
 )
 
+// Any thing can be converted to a sql and its arguments is an expression
 type Expression interface {
-	Sql(context interface{}) (string, []interface{})
+	ToSql() (string, []interface{})
 }
 
+// Raw expression just a wrapper of a sql and relative arguments
 type Raw struct {
-	sql       string
-	arguments []interface{}
+	Sql       string
+	Arguments []interface{}
 }
 
-func (s Raw) Sql(context interface{}) (string, []interface{}) {
-	return s.sql, s.arguments
+func (s Raw) ToSql() (string, []interface{}) {
+	return s.Sql, s.Arguments
 }
 
 func NewRaw(sql string, arguments ...interface{}) Raw {
-	return Raw{sql: sql, arguments: arguments}
+	return Raw{Sql: sql, Arguments: arguments}
 }
 
-type joiner struct {
-	expressions []interface{}
-	sep string
-	prefix string
-	suffix string
+// formatter is a generic helper, which provide the way to join several expressions
+// together.
+type formatter struct {
+	components []interface{}
+	sep        string
+	prefix     string
+	suffix     string
 }
 
-func (s joiner) Sql(context interface{}) (string, []interface{}) {
-	sql := []string{}
-	arguments := []interface{}{}
-	for _, exp := range s.expressions {
-		if exp != nil {
-			expSql, expArgs := Exp(exp).Sql(context)
-			sql = append(sql, expSql)
-			arguments = append(arguments, expArgs...)
-		}
+func (s formatter) ToSql() (string, []interface{}) {
+	sql := make([]string, len(s.components))
+	arguments := make([]interface{}, 0, len(s.components))
+	for i, component := range s.components {
+		expSql, expArgs := Exp(component).ToSql()
+		sql[i] = expSql
+		arguments = append(arguments, expArgs...)
 	}
 
 	return s.prefix + strings.Join(sql, s.sep) + s.suffix, arguments
 }
 
+// node holds several expressions and join them one by one
 type node struct {
 	expressions []Expression
 }
 
-func (r node) Sql(context interface{}) (string, []interface{}) {
+func (r node) ToSql() (string, []interface{}) {
 	buf := bytes.Buffer{}
 	arguments := []interface{}{}
 
@@ -56,9 +59,7 @@ func (r node) Sql(context interface{}) (string, []interface{}) {
 		var expSql string
 		var expArgs []interface{}
 
-		// If we have a context by our self, then we pass it down
-		// Otherwise, pass the passed in context down
-		expSql, expArgs = e.Sql(context)
+		expSql, expArgs = e.ToSql()
 
 		buf.WriteString(" " + expSql)
 		arguments = append(arguments, expArgs...)
@@ -68,12 +69,16 @@ func (r node) Sql(context interface{}) (string, []interface{}) {
 }
 
 func G(components ...interface{}) Expression {
-	return Exp("(", components, ")")
+	return formatter{
+		components: components,
+		prefix: "(",
+		suffix: ")",
+	}
 }
 
 func And(expressions ...interface{}) Expression {
-	return joiner{
-		expressions: expressions,
+	return formatter{
+		components: expressions,
 		sep: " AND",
 		prefix: "(",
 		suffix: ")",
@@ -81,8 +86,8 @@ func And(expressions ...interface{}) Expression {
 }
 
 func Or(filters ...interface{}) Expression {
-	return joiner{
-		expressions: filters,
+	return formatter{
+		components: filters,
 		sep: " OR",
 		prefix: "(",
 		suffix: ")",
@@ -90,33 +95,39 @@ func Or(filters ...interface{}) Expression {
 }
 
 func Not(exp interface{}) Expression {
-	return Exp("NOT", exp)
+	return formatter{
+		components: []interface{}{exp},
+		prefix: "NOT",
+	}
 }
 
-func flat(i interface{}) []interface{} {
-	result := []interface{}{}
-	switch t := i.(type) {
-	case []interface{}:
-		for _, e := range t {
-			result = append(result, flat(e)...)
-		}
-	default:
-		result = append(result, t)
+
+// sep format
+// (,)  (1,2,3,4)
+// , 1,2,3,4
+// If the sep has three letters, then the first is prefix, last is suffix and middle is the sep
+
+func Format(sepFormat string, expressions ...interface{}) Expression {
+	var prefix, sep, suffix string
+
+	if len(sepFormat) == 3 {
+		components := strings.Split(sepFormat, "")
+		prefix, sep, suffix = components[0], components[1], components[2]
+	} else {
+		sep = sepFormat
 	}
 
-	return result
-}
-
-func Join(sep string, expressions ...interface{}) Expression {
-	return joiner{
+	return formatter{
 		// When expression passed in as [[1,2,3]], we prefer it converts to [1,2,3]
-		expressions: flat(expressions),
+		components: flat(expressions),
+		prefix: prefix,
 		sep: sep,
+		suffix: suffix,
 	}
 }
 
 func Build(expressions ...interface{}) (string, []interface{}) {
-	return Exp(expressions).Sql(nil)
+	return Exp(expressions).ToSql()
 }
 
 type Param struct{
@@ -127,12 +138,12 @@ func P(value interface{}) Param {
 	return Param{inner: value}
 }
 
-type Value struct {
+type value struct {
 	inner interface{}
 }
 
-func V(v interface{}) Value {
-	return Value{inner: v}
+func V(v interface{}) value {
+	return value{inner: v}
 }
 
 func Exp(components ...interface{}) Expression {
@@ -150,7 +161,7 @@ func Exp(components ...interface{}) Expression {
 		case Param:
 			exp = NewRaw("?", v.inner)
 			shouldDoMerge = true
-		case Value:
+		case value:
 			toBeMerged = append(toBeMerged, fmt.Sprintf("%v", deRef(v.inner)))
 		case Expression:
 			exp = v
@@ -180,27 +191,3 @@ func Exp(components ...interface{}) Expression {
 	return node{expressions: expressions}
 }
 
-func deRef(i interface{}) interface{} {
-	switch t := i.(type) {
-	case *string:
-		return *t
-	case *int:
-		return *t
-	case *int8:
-		return *t
-	case *int16:
-		return *t
-	case *int32:
-		return *t
-	case *int64:
-		return *t
-	case *float32:
-		return *t
-	case *float64:
-		return *t
-	case *interface{}:
-		return *t
-	default:
-		return t
-	}
-}
