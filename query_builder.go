@@ -11,31 +11,16 @@ type Expression interface {
 }
 
 type Raw struct {
-	value string
+	sql       string
 	arguments []interface{}
 }
 
 func (s Raw) Sql() (string, []interface{}) {
-	return s.value, s.arguments
+	return s.sql, s.arguments
 }
 
-func SetMapper(mapper *FieldsMapper, fielder Fielder) Expression {
-	columns := mapper.Columns()
-	fields := mapper.Fields(fielder)
-
-	buf := bytes.Buffer{}
-	for i := 0; i < len(columns); i++ {
-		if i < len(columns) - 1 {
-			buf.WriteString(fmt.Sprintf("%s = ?,", columns[i]))
-		} else {
-			buf.WriteString(fmt.Sprintf("%s = ?", columns[i]))
-		}
-	}
-
-	return Raw {
-		value: fmt.Sprintf("SET %s", string(buf.String())),
-		arguments: fields,
-	}
+func NewRaw(sql string, arguments ...interface{}) Raw {
+	return Raw{sql: sql, arguments: arguments}
 }
 
 type joiner struct {
@@ -57,6 +42,42 @@ func (s joiner) Sql() (string, []interface{}) {
 	}
 
 	return s.prefix + strings.Join(sql, s.sep) + s.suffix, arguments
+}
+
+type node struct {
+	expressions []Expression
+}
+
+func (r node) Sql() (string, []interface{}) {
+	buf := bytes.Buffer{}
+	arguments := []interface{}{}
+
+	for _, e := range r.expressions {
+		expSql, expArgs := e.Sql()
+		buf.WriteString(" " + expSql)
+		arguments = append(arguments, expArgs...)
+	}
+
+	return buf.String(), arguments
+}
+
+func SetMapper(mapper *FieldsMapper, fielder Fielder) Expression {
+	columns := mapper.Columns()
+	fields := mapper.Fields(fielder)
+
+	buf := bytes.Buffer{}
+	for i := 0; i < len(columns); i++ {
+		if i < len(columns) - 1 {
+			buf.WriteString(fmt.Sprintf("%s = ?,", columns[i]))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s = ?", columns[i]))
+		}
+	}
+
+	return Raw {
+		sql: fmt.Sprintf("SET %s", string(buf.String())),
+		arguments: fields,
+	}
 }
 
 func G(components ...interface{}) Expression {
@@ -101,6 +122,7 @@ func flat(i interface{}) []interface{} {
 
 func Join(sep string, expressions ...interface{}) Expression {
 	return joiner{
+		// When expression passed in as [[1,2,3]], we prefer it converts to [1,2,3]
 		expressions: flat(expressions),
 		sep: sep,
 	}
@@ -127,33 +149,48 @@ func V(v interface{}) Value {
 }
 
 func Exp(components ...interface{}) Expression {
-	// If the component is param then we wrap it
-	// Otherwise, we just append it to sql expression
-	buf := bytes.Buffer{}
-	arguments := []interface{}{}
-	for _, c := range flat(components) {
-		if p, ok := c.(Param); ok {
-			buf.WriteString(" ?")
-			arguments = append(arguments, p.inner)
-		} else if v, ok := c.(Value); ok {
-			buf.WriteString(fmt.Sprintf(" %v", deRef(v.inner)))
-		} else if p, ok := c.(Expression); ok {
-			sql, args := p.Sql()
-			buf.WriteString(" " + sql)
-			arguments = append(arguments, args...)
-		} else {
-			if s, ok := c.(string); ok {
-				buf.WriteString(" " + s)
-			} else {
-				buf.WriteString(fmt.Sprintf(" %v", deRef(c)))
-			}
+	expressions := []Expression{}
+	components = flat(components)
+
+	toBeMerged := []string{}
+	shouldDoMerge := false
+
+	for i := 0; i < len(components); i++ {
+		c := components[i]
+
+		var exp Expression
+		switch v := c.(type) {
+		case Param:
+			exp = NewRaw("?", v.inner)
+			shouldDoMerge = true
+		case Value:
+			toBeMerged = append(toBeMerged, fmt.Sprintf("%v", deRef(v.inner)))
+		case Expression:
+			exp = v
+			shouldDoMerge = true
+		case string:
+			toBeMerged = append(toBeMerged, v)
+			shouldDoMerge = false
+		default:
+			toBeMerged = append(toBeMerged, fmt.Sprintf("%v", deRef(v)))
+			shouldDoMerge = false
+		}
+
+		if shouldDoMerge {
+			expressions = append(expressions, NewRaw(strings.Join(toBeMerged, " ")))
+			toBeMerged = []string{}
+			shouldDoMerge = false
+		}
+
+		if exp != nil {
+			expressions = append(expressions, exp)
 		}
 	}
-
-	return Raw {
-		value: string(buf.Bytes()),
-		arguments: arguments,
+	if len(toBeMerged) > 0 {
+		expressions = append(expressions, NewRaw(strings.Join(toBeMerged, " ")))
 	}
+
+	return node{expressions: expressions}
 }
 
 func deRef(i interface{}) interface{} {

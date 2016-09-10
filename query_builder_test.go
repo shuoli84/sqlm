@@ -24,7 +24,7 @@ func (t *TestFielder) FieldForName(name string) interface{} {
 
 func TestQueryBuilder(t *testing.T) {
 	{
-		sql, arguments := Build(Exp(
+		sql, arguments := Exp(
 			"SELECT abc, def FROM what",
 			"WHERE", Not(
 				And(
@@ -35,7 +35,7 @@ func TestQueryBuilder(t *testing.T) {
 					),
 				),
 			),
-		))
+		).Sql()
 
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
@@ -47,15 +47,13 @@ func TestQueryBuilder(t *testing.T) {
 			&TestFielder{"1","2"},
 			&TestFielder{"3","4"},
 		}
-		sql, arguments := Build(
-			Exp(
-				"INSERT INTO table2 (", mapper.ColumnString(), ") VALUES",
-				Join(",",
-					Exp("(", Join(",", mapper.Fields(values[0])), ")"),
-					Exp("(", Join(",", mapper.Fields(values[1])), ")"),
-				),
+		sql, arguments := Exp(
+			"INSERT INTO table2 (", mapper.ColumnString(), ") VALUES",
+			Join(",",
+				Exp("(", Join(",", mapper.Fields(values[0])), ")"),
+				Exp("(", Join(",", mapper.Fields(values[1])), ")"),
 			),
-		)
+		).Sql()
 
 		// TODO for int, there is no use to do ?. Only string should be taken care
 		fmt.Println(sql)
@@ -79,10 +77,10 @@ func TestQueryBuilder(t *testing.T) {
 
 	{
 		table := "tablename"
-		sql, arguments := Build(
+		sql, arguments := Exp(
 			"DELETE FROM", table,
-			"WHERE abc = ", 1,
-		)
+			"WHERE abc =", 1,
+		).Sql()
 
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
@@ -108,6 +106,27 @@ func TestQueryBuilder(t *testing.T) {
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
 	}
+
+	{
+
+		// SELECT * FROM table
+		// WHERE abc = 1 AND bcd = 2 AND (abc = 1  AND def >=  ?)
+
+		sql, arguments := Exp(
+			"SELECT * FROM table",
+			"WHERE abc =", 1, "AND", "bcd =", 2, "AND",
+			And(
+				Exp("abc", "=", "1"),
+				Exp("def", ">=", P(3000)),
+				G(
+					G("abc =", 123), "AND", G("bce =", 345),
+				),
+			),
+		).Sql()
+
+		fmt.Println(sql)
+		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
+	}
 }
 
 func BenchmarkExp(b *testing.B) {
@@ -124,6 +143,23 @@ func BenchmarkExp(b *testing.B) {
 				),
 			),
 		)
+	}
+}
+
+func BenchmarkNode(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		Exp(
+			"SELECT abc, def FROM what",
+			"WHERE", Not(
+				And(
+					Exp("user_id >", P(12345)),
+					And(
+						Exp("media_id", "<", 12345),
+						Exp("time_uuid", "=", 12345),
+					),
+				),
+			),
+		).Sql()
 	}
 }
 
