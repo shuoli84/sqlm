@@ -49,11 +49,15 @@ func TestQueryBuilder(t *testing.T) {
 		}
 		sql, arguments := Build(
 			Exp(
-				"INSERT INTO table2 (", mapper.ColumnString(), ") VALUES ",
-				"(", Join(",", mapper.Fields(values[0])), ")",
+				"INSERT INTO table2 (", mapper.ColumnString(), ") VALUES",
+				Join(",",
+					Exp("(", Join(",", mapper.Fields(values[0])), ")"),
+					Exp("(", Join(",", mapper.Fields(values[1])), ")"),
+				),
 			),
 		)
 
+		// TODO for int, there is no use to do ?. Only string should be taken care
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
 	}
@@ -89,7 +93,7 @@ func TestQueryBuilder(t *testing.T) {
 		// SELECT * FROM table
 		// WHERE abc = 1 AND bcd = 2 AND (abc = 1  AND def >=  ?)
 
-		sql, arguments := Build(Exp(
+		sql, arguments := Build(
 			"SELECT * FROM table",
 			"WHERE abc =", 1, "AND", "bcd =", 2, "AND",
 			And(
@@ -99,7 +103,7 @@ func TestQueryBuilder(t *testing.T) {
 					G("abc =", 123), "AND", G("bce =", 345),
 				),
 			),
-		))
+		)
 
 		fmt.Println(sql)
 		fmt.Printf("len: %d, %v\n", len(arguments), arguments)

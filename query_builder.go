@@ -85,15 +85,15 @@ func Not(exp interface{}) Expression {
 	return Exp("NOT", exp)
 }
 
-func flat(expressions ...interface{}) []interface{} {
+func flat(i interface{}) []interface{} {
 	result := []interface{}{}
-	for _, e := range expressions {
-		switch t := e.(type) {
-		case []interface{}:
-			result = append(result, flat(t...)...)
-		default:
-			result = append(result, t)
+	switch t := i.(type) {
+	case []interface{}:
+		for _, e := range t {
+			result = append(result, flat(e)...)
 		}
+	default:
+		result = append(result, t)
 	}
 
 	return result
