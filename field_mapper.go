@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type Fielder interface {
@@ -35,7 +36,7 @@ func (r *Mapper) Fields(fielder Fielder) []interface{} {
 	return fields
 }
 
-func (r *Mapper) FormatSQLInsertValues(fielders []Fielder) (string, []interface{}) {
+func (r *Mapper) FormatSQLInsertValues(fielders []Fielder) Expression {
 	valueString := bytes.Buffer{}
 	args := []interface{}{}
 
@@ -63,10 +64,10 @@ func (r *Mapper) FormatSQLInsertValues(fielders []Fielder) (string, []interface{
 		}
 	}
 
-	return valueString.String(), args
+	return NewRaw(valueString.String(), args)
 }
 
-func (r *Mapper) FormatSQLUpdateSets(fielder Fielder) (string, []interface{}) {
+func (r *Mapper) FormatSQLUpdateSets(fielder Fielder) Expression {
 	fields := r.Fields(fielder)
 	buf := bytes.Buffer{}
 	args := []interface{}{}
@@ -80,7 +81,7 @@ func (r *Mapper) FormatSQLUpdateSets(fielder Fielder) (string, []interface{}) {
 			buf.WriteString(fmt.Sprintf("%v", field))
 		}
 	}
-	return string(buf.Bytes()), fields
+	return NewRaw(string(buf.Bytes()), fields)
 }
 
 func sqlShouldEscape(i interface{}) bool {
@@ -89,6 +90,19 @@ func sqlShouldEscape(i interface{}) bool {
 	} else if _, ok := i.(*string); ok {
 		return true
 	}
+
+	if _, ok := i.(time.Time); ok {
+		return true
+	} else if _, ok := i.(*time.Time); ok {
+		return true
+	}
+
+	if _, ok := i.([]byte); ok {
+		return true
+	} else if _, ok := i.(*[]byte); ok {
+		return true
+	}
+
 	return false
 }
 
@@ -111,10 +125,4 @@ func (r *Mapper) LoadFromDict(dict map[string]interface{}, fielder Fielder) {
 			continue
 		}
 	}
-}
-
-type FielderMap map[string]interface{}
-
-func (r *FielderMap) FieldForName(name string) interface{} {
-	return map[string]interface{}(*r)[name]
 }

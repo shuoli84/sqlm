@@ -21,7 +21,7 @@ func (s Raw) ToSql() (string, []interface{}) {
 }
 
 func NewRaw(sql string, arguments ...interface{}) Raw {
-	return Raw{Sql: sql, Arguments: arguments}
+	return Raw{Sql: sql, Arguments: flat(arguments)}
 }
 
 // formatter is a generic helper, which provide the way to join several expressions

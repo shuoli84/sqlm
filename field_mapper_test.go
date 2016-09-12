@@ -34,7 +34,7 @@ func TestFieldMapper(t *testing.T) {
 		&TestFielder2{"9", "10", 5},
 	}
 
-	sql, args := mapper.FormatSQLInsertValues(values)
+	sql, args := mapper.FormatSQLInsertValues(values).ToSql()
 	fmt.Println(sql)
 	fmt.Printf("%v\n", args)
 
