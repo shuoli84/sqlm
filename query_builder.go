@@ -1,8 +1,8 @@
 package sqlm
 
 import (
-	"strings"
 	"fmt"
+	"strings"
 )
 
 // Any thing can be converted to a sql and its arguments is an expression
@@ -79,9 +79,9 @@ func F(sepFormat string, expressions ...interface{}) Expression {
 	return formatter{
 		// When expression passed in as [[1,2,3]], we prefer it converts to [1,2,3]
 		expressions: componentsToExpressions(expressions),
-		prefix: prefix,
-		sep: sep,
-		suffix: suffix,
+		prefix:      prefix,
+		sep:         sep,
+		suffix:      suffix,
 	}
 }
 
@@ -89,12 +89,12 @@ func Build(expressions ...interface{}) (string, []interface{}) {
 	return Exp(expressions).ToSql()
 }
 
-type Param struct{
+type Param struct {
 	inner interface{}
 }
 
-func P(value interface{}) Param {
-	return Param{inner: value}
+func P(value interface{}) Expression {
+	return Raw{"?", []interface{}{value}}
 }
 
 func Exp(components ...interface{}) Expression {
@@ -112,17 +112,13 @@ func componentsToExpressions(components []interface{}) []Expression {
 		switch v := c.(type) {
 		case Expression:
 			exp = v
-		case Param:
-			exp = NewRaw("?", v.inner)
 		case string:
 			exp = NewRaw(v)
 		default:
 			exp = NewRaw(fmt.Sprintf("%v", deRef(v)))
 		}
 
-		if exp != nil {
-			expressions = append(expressions, exp)
-		}
+		expressions = append(expressions, exp)
 	}
 
 	return expressions

@@ -1,42 +1,40 @@
 package sqlm
 
+import "reflect"
+
+// Deref,
 func deRef(i interface{}) interface{} {
-	switch t := i.(type) {
-	case *string:
-		return *t
-	case *int:
-		return *t
-	case *int8:
-		return *t
-	case *int16:
-		return *t
-	case *int32:
-		return *t
-	case *int64:
-		return *t
-	case *float32:
-		return *t
-	case *float64:
-		return *t
-	case *interface{}:
-		return *t
+	typeOfI := reflect.TypeOf(i)
+	switch typeOfI.Kind() {
+	case reflect.Ptr:
+		return deRef(reflect.ValueOf(i).Elem().Interface())
 	default:
-		return t
+		return i
 	}
 }
 
 func flat(i interface{}) []interface{} {
-	result := []interface{}{}
-	switch t := i.(type) {
-	case []interface{}:
-		for _, e := range t {
-			result = append(result, flat(e)...)
+	result := reflect.ValueOf([]interface{}{})
+
+	kindOfI := reflect.TypeOf(i).Kind()
+	valueOfI := reflect.ValueOf(i)
+	switch kindOfI {
+	case reflect.Ptr:
+		result = reflect.Append(result, reflect.ValueOf(i))
+	case reflect.Slice, reflect.Array:
+		// Iterate the slice and flat each of them
+		for i := 0; i < valueOfI.Len(); i++ {
+			result = reflect.AppendSlice(
+				result,
+				reflect.ValueOf(
+					flat(valueOfI.Index(i).Interface())))
 		}
 	default:
-		result = append(result, t)
+		result = reflect.Append(result, reflect.ValueOf(i))
 	}
 
-	return result
+	back := result.Interface()
+	return back.([]interface{})
 }
 
 func assign(target interface{}, value interface{}) error {

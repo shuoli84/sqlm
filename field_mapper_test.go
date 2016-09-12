@@ -1,8 +1,8 @@
 package sqlm
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 type TestFielder2 struct {
@@ -26,7 +26,7 @@ func (r *TestFielder2) FieldForName(name string) interface{} {
 
 func TestFieldMapper(t *testing.T) {
 	mapper := NewMapper([]string{"field_1", "field_2", "field_3"})
-	values := []Fielder {
+	values := []Fielder{
 		&TestFielder2{"1", "2", 1},
 		&TestFielder2{"3", "4", 2},
 		&TestFielder2{"5", "6", 3},
@@ -36,10 +36,10 @@ func TestFieldMapper(t *testing.T) {
 
 	sql, args := mapper.FormatSQLInsertValues(values)
 	fmt.Println(sql)
-	fmt.Println("%v", args)
+	fmt.Printf("%v\n", args)
 
 	dict := mapper.PackDict(values[0])
-	fmt.Println("%v", dict)
+	fmt.Printf("%v\n", dict)
 
 	v := &TestFielder2{}
 	mapper.LoadFromDict(dict, v)

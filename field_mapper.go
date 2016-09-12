@@ -2,8 +2,8 @@ package sqlm
 
 import (
 	"bytes"
-	"strings"
 	"fmt"
+	"strings"
 )
 
 type Fielder interface {
@@ -51,14 +51,14 @@ func (r *Mapper) FormatSQLInsertValues(fielders []Fielder) (string, []interface{
 				valueString.WriteString(fmt.Sprintf("%v", deRef(field)))
 			}
 
-			if i < len(r.fieldNames) - 1 {
+			if i < len(r.fieldNames)-1 {
 				valueString.WriteString(",")
 			} else {
 				valueString.WriteString(")")
 			}
 		}
 
-		if index < len(fielders) - 1 {
+		if index < len(fielders)-1 {
 			valueString.WriteString(",")
 		}
 	}

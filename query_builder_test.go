@@ -1,9 +1,9 @@
 package sqlm
 
 import (
-	"testing"
-	"fmt"
 	"errors"
+	"fmt"
+	"testing"
 )
 
 type TestFielder struct {
