@@ -89,10 +89,6 @@ func Build(expressions ...interface{}) (string, []interface{}) {
 	return Exp(expressions).ToSql()
 }
 
-type Param struct {
-	inner interface{}
-}
-
 func P(value interface{}) Expression {
 	return Raw{"?", []interface{}{value}}
 }
