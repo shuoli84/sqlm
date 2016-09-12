@@ -3,11 +3,26 @@ A minimalist sql builder
 
 # Motivation
 
-* No love on ORMs. If you want to get serious on SQL, you should write SQL.
-* Tired of fmt.Sprintf of SQL, it is trouble some, hard to change, and readability is awful.
-* Need some code which put no constrain on how to write sql.
+* Used and tired of ORM. It adds so many abstraction and you have to learn its paradim to do something non-trivial.
+* Getting tired of fmt.Sprintf of SQL, you have to put a %s and then append some value, or put a ? and counting the args number.
+* Composible, easily composed by table name, columns and arguments which defined at different places. 
 
-So here comes sqlm, which just format sql, escape the arguments.
+So here comes sqlm, which just format sql, escape the arguments with the same structure as raw sql.
+
+```Go
+db.Query(fmt.Sprintf(
+	`SELECT %s FROM %s 
+ 	WHERE %s = ?`, columns, table, fieldName), 
+ 	fieldValue);
+```
+vs
+```Go
+sql, args := sqlm.Build(
+	"SELECT", columns, "FROM", table,
+	"WHERE", fieldName, "=", sqlm.P(fieldValue),
+)
+db.Query(sql, args...)
+```
 
 Examples:
 Select
