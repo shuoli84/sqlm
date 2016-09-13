@@ -15,19 +15,21 @@ type Mapper struct {
 	fieldNames []string
 }
 
-func NewMapper(fields []string) *Mapper {
-	return &Mapper{fields}
+func NewMapper(fields []string) Mapper {
+	return Mapper{fields}
 }
 
-func (r *Mapper) Columns() []string {
+var EmptyMapper = Mapper{}
+
+func (r Mapper) Columns() []string {
 	return r.fieldNames
 }
 
-func (r *Mapper) ColumnString() string {
+func (r Mapper) ColumnString() string {
 	return strings.Join(r.Columns(), ", ")
 }
 
-func (r *Mapper) Fields(fielder Fielder) []interface{} {
+func (r Mapper) Fields(fielder Fielder) []interface{} {
 	fields := make([]interface{}, len(r.fieldNames))
 	for i, fieldName := range r.fieldNames {
 		fields[i] = fielder.FieldForName(fieldName)
@@ -36,7 +38,7 @@ func (r *Mapper) Fields(fielder Fielder) []interface{} {
 	return fields
 }
 
-func (r *Mapper) FormatSQLInsertValues(fielders []Fielder) Expression {
+func (r Mapper) FormatSQLInsertValues(fielders []Fielder) Expression {
 	valueString := bytes.Buffer{}
 	args := []interface{}{}
 
@@ -67,7 +69,7 @@ func (r *Mapper) FormatSQLInsertValues(fielders []Fielder) Expression {
 	return NewRaw(valueString.String(), args)
 }
 
-func (r *Mapper) FormatSQLUpdateSets(fielder Fielder) Expression {
+func (r Mapper) FormatSQLUpdateSets(fielder Fielder) Expression {
 	fields := r.Fields(fielder)
 	buf := bytes.Buffer{}
 	args := []interface{}{}
@@ -106,7 +108,7 @@ func sqlShouldEscape(i interface{}) bool {
 	return false
 }
 
-func (r *Mapper) PackDict(fielder Fielder) map[string]interface{} {
+func (r Mapper) PackDict(fielder Fielder) map[string]interface{} {
 	result := map[string]interface{}{}
 
 	for _, fieldName := range r.fieldNames {
@@ -117,7 +119,7 @@ func (r *Mapper) PackDict(fielder Fielder) map[string]interface{} {
 }
 
 // Load from dict, you can treat it as a way of deserialize, but just from map
-func (r *Mapper) LoadFromDict(dict map[string]interface{}, fielder Fielder) {
+func (r Mapper) LoadFromDict(dict map[string]interface{}, fielder Fielder) {
 	for _, fieldName := range r.fieldNames {
 		if v, ok := dict[fieldName]; ok {
 			assign(fielder.FieldForName(fieldName), v)
