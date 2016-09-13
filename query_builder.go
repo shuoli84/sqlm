@@ -3,6 +3,7 @@ package sqlm
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Any thing can be converted to a sql and its arguments is an expression
@@ -65,7 +66,6 @@ func Not(exp interface{}) Expression {
 // (1,2) => prefix:( sep:, suffix:)
 // 1,2  => prefix: sep:, suffix:
 // If the sep has three letters, then the first is prefix, last is suffix and middle is the sep
-
 func F(sepFormat string, expressions ...interface{}) Expression {
 	var prefix, sep, suffix string
 
@@ -89,14 +89,43 @@ func Build(expressions ...interface{}) (string, []interface{}) {
 	return Exp(expressions).ToSql()
 }
 
+// Explicit set value as argument
 func P(value interface{}) Expression {
 	return Raw{"?", []interface{}{value}}
 }
 
+// Convert all components to Value expression
+// E.g, 1 => 1
+//      "what" => "?" args: "what"
+//      Time => "?" args: "Time"
+func V(components ...interface{}) []Expression {
+	components = flat(components)
+	expressions := []Expression{}
+
+	for i := 0; i < len(components); i++ {
+		c := components[i]
+
+		var exp Expression
+		switch v := c.(type) {
+		case Expression:
+			exp = v
+		case string, *string, []byte, time.Time, *[]byte, *time.Time:
+			exp = NewRaw("?", v)
+		default:
+			exp = NewRaw(fmt.Sprintf("%v", deRef(v)))
+		}
+
+		expressions = append(expressions, exp)
+	}
+	return expressions
+}
+
+// Exp("SELECT", "a, b", "FROM", tableName) => "SELECT a, b FROM table". Use space to join all expressions
 func Exp(components ...interface{}) Expression {
 	return F("1 2", components)
 }
 
+// Apply to non-value sql expression. convert arbitrary types to string and arguments
 func componentsToExpressions(components []interface{}) []Expression {
 	expressions := []Expression{}
 	components = flat(components)
@@ -110,6 +139,10 @@ func componentsToExpressions(components []interface{}) []Expression {
 			exp = v
 		case string:
 			exp = NewRaw(v)
+		case *string:
+			exp = NewRaw(*v)
+		case []byte, time.Time, *[]byte, *time.Time:
+			exp = NewRaw("?", c)
 		default:
 			exp = NewRaw(fmt.Sprintf("%v", deRef(v)))
 		}

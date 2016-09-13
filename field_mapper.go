@@ -29,6 +29,60 @@ func (r Mapper) ColumnString() string {
 	return strings.Join(r.Columns(), ", ")
 }
 
+func contains(items []string, target string) bool {
+	for i := 0; i < len(items); i++ {
+		if items[i] == target {
+			return true
+		}
+	}
+	return false
+}
+
+// split set "from" into two sets, in and out
+func split(from []string, set []string) ([]string, []string) {
+	inSet := make([]string, 0)
+	outSet := make([]string, 0)
+	for i := 0; i < len(from); i++ {
+		item := from[i]
+		if contains(set, item) {
+			inSet = append(inSet, item)
+		} else {
+			outSet = append(outSet, item)
+		}
+	}
+
+	return inSet, outSet
+}
+
+func dedup(items []string) []string {
+	result := []string{}
+	for _, item := range(items) {
+		var shouldAppend = true
+		for _, existedItem := range(result) {
+			if item == existedItem {
+				shouldAppend = false
+				break
+			}
+		}
+
+		if shouldAppend {
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
+// Split the mapper into two, one in the fields, one not
+func (r Mapper) Split(fields []string) (Mapper, Mapper) {
+	columnsIn, columnsOut := split(r.Columns(), fields)
+	return NewMapper(columnsIn), NewMapper(columnsOut)
+}
+
+func (r Mapper) Append(fields ...string) Mapper {
+	return NewMapper(dedup(append(r.Columns(), fields...)))
+}
+
 func (r Mapper) Fields(fielder Fielder) []interface{} {
 	fields := make([]interface{}, len(r.fieldNames))
 	for i, fieldName := range r.fieldNames {
