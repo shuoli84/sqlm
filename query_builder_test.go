@@ -99,10 +99,10 @@ func TestJoin(t *testing.T) {
 	sql, args := Build(
 		"INSERT INTO table (a, b, c) VALUES",
 		F("1, 2",
-			F("(1 ,2)", 1, 2, 3),
-			F("(1 ,2)", 4, 5, 6),
-			F("(1 ,2)", 7, 8, 9),
-			F("(1 ,2)", 10, P(11), 12),
+			F("(1, 2)", 1, 2, 3),
+			F("(1, 2)", 4, 5, 6),
+			F("(1, 2)", 7, 8, 9),
+			F("(1, 2)", 10, P(11), 12),
 		),
 	)
 
@@ -118,29 +118,12 @@ func BenchmarkExp(b *testing.B) {
 				And(
 					Exp("user_id >", P(12345)),
 					And(
-						Exp("media_id", "<", 12345),
-						Exp("time_uuid", "=", 12345),
+						Exp("media_id <", 12345),
+						Exp("time_uuid =", 12345),
 					),
 				),
 			),
 		)
-	}
-}
-
-func BenchmarkNode(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		Exp(
-			"SELECT abc, def FROM what",
-			"WHERE", Not(
-				And(
-					Exp("user_id >", P(12345)),
-					And(
-						Exp("media_id", "<", 12345),
-						Exp("time_uuid", "=", 12345),
-					),
-				),
-			),
-		).ToSql()
 	}
 }
 

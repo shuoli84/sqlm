@@ -89,16 +89,11 @@ func Build(expressions ...interface{}) (string, []interface{}) {
 	return Exp(expressions).ToSql()
 }
 
-// Explicit set value as argument
-func P(value interface{}) Expression {
-	return Raw{"?", []interface{}{value}}
-}
-
 // Convert all components to Value expression
 // E.g, 1 => 1
 //      "what" => "?" args: "what"
 //      Time => "?" args: "Time"
-func V(components ...interface{}) []Expression {
+func P(components ...interface{}) []Expression {
 	components = flat(components)
 	expressions := []Expression{}
 
