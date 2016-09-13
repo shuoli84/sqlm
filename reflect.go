@@ -1,9 +1,18 @@
 package sqlm
 
-import "reflect"
+import (
+	"reflect"
+)
 
-// Deref,
+var derefCount int64 = 0
+var flatCount int64 = 0
+
+// Deref
 func deRef(i interface{}) interface{} {
+	if i == nil {
+		return i
+	}
+	derefCount += 1
 	typeOfI := reflect.TypeOf(i)
 	switch typeOfI.Kind() {
 	case reflect.Ptr:
@@ -14,20 +23,31 @@ func deRef(i interface{}) interface{} {
 }
 
 func flat(i interface{}) []interface{} {
+	flatCount += 1
+
 	result := reflect.ValueOf([]interface{}{})
 
 	kindOfI := reflect.TypeOf(i).Kind()
 	valueOfI := reflect.ValueOf(i)
+
 	switch kindOfI {
 	case reflect.Ptr:
 		result = reflect.Append(result, reflect.ValueOf(i))
 	case reflect.Slice, reflect.Array:
 		// Iterate the slice and flat each of them
-		for i := 0; i < valueOfI.Len(); i++ {
-			result = reflect.AppendSlice(
-				result,
-				reflect.ValueOf(
-					flat(valueOfI.Index(i).Interface())))
+		for index := 0; index < valueOfI.Len(); index++ {
+			v := valueOfI.Index(index)
+			/*
+			if v.CanInterface() {
+				v = v.Elem()
+			}
+			*/
+			if v.Elem().Kind() == reflect.Slice || v.Elem().Kind() == reflect.Array {
+				result = reflect.AppendSlice(result,
+					reflect.ValueOf(flat(v.Interface())))
+			} else {
+				result = reflect.Append(result, v)
+			}
 		}
 	default:
 		result = reflect.Append(result, reflect.ValueOf(i))

@@ -111,19 +111,18 @@ func TestJoin(t *testing.T) {
 }
 
 func BenchmarkExp(b *testing.B) {
-	expressions := []Expression{}
-	for i := 0; i < 1000; i++ {
-		x := []interface{}{}
-		for j := 0; j < 10; j++ {
-			x = append(x, j)
+	for i := 0; i < b.N; i++ {
+		expressions := make([]Expression, 1000)
+		for i := 0; i < 100; i++ {
+			x := make([]interface{}, 0, 10)
+			for j := 0; j < 10; j++ {
+				x = append(x, i * 10 + j)
+			}
+
+			expressions[i] = F("1, 2", x)
 		}
 
-		expressions = append(expressions, F("1, 2", P(x)))
-	}
-	fmt.Printf("There are %d expressions\n", len(expressions))
-	for i := 0; i < b.N; i++ {
-		Build(
-			"SELECT abc, def FROM what",
+		Build( "SELECT abc, def FROM what",
 			"WHERE", Not(
 				And(
 					Exp("user_id >", P(12345)),
@@ -131,11 +130,44 @@ func BenchmarkExp(b *testing.B) {
 						Exp("media_id <", 12345),
 						Exp("time_uuid =", 12345),
 					),
-					expressions,
+					F("1, 2",
+						expressions,
+					),
 				),
 			),
 		)
+
 	}
+}
+
+func TestFlatCount(t *testing.T) {
+	expressions := make([]Expression, 1000)
+	for i := 0; i < 1000; i++ {
+		x := make([]interface{}, 0, 10)
+		for j := 0; j < 10; j++ {
+			x = append(x, i * 10 + j)
+		}
+
+		expressions[i] = F("(1, 2)", x)
+	}
+
+	sql, args := Build( "SELECT abc, def FROM what",
+		"WHERE", Not(
+			And(
+				Exp("user_id >", P(12345)),
+				And(
+					Exp("media_id <", 12345),
+					Exp("time_uuid =", 12345),
+				),
+				F("1, 2",
+					expressions,
+				),
+			),
+		),
+	)
+
+	fmt.Printf("%s %T\n", sql, args)
+	fmt.Printf("Flatted: %d Dereffed: %d\n", flatCount, derefCount)
 }
 
 func BenchmarkSimple(b *testing.B) {

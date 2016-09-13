@@ -22,6 +22,12 @@ func (s Raw) ToSql() (string, []interface{}) {
 }
 
 func NewRaw(sql string, arguments ...interface{}) Raw {
+	if len(arguments) == 0 {
+		return Raw{Sql: sql, Arguments: arguments}
+	} else if len(arguments) == 1 {
+		return Raw{Sql: sql, Arguments: flat(arguments[0])}
+	}
+
 	return Raw{Sql: sql, Arguments: flat(arguments)}
 }
 
@@ -86,7 +92,8 @@ func F(sepFormat string, expressions ...interface{}) Expression {
 }
 
 func Build(expressions ...interface{}) (string, []interface{}) {
-	return Exp(expressions).ToSql()
+	sql, args := Exp(expressions).ToSql()
+	return sql, args
 }
 
 // Convert all components to Value expression
