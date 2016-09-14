@@ -37,14 +37,13 @@ func flat(i interface{}) []interface{} {
 		// Iterate the slice and flat each of them
 		for index := 0; index < valueOfI.Len(); index++ {
 			v := valueOfI.Index(index)
-			/*
-			if v.CanInterface() {
-				v = v.Elem()
-			}
-			*/
-			if v.Elem().Kind() == reflect.Slice || v.Elem().Kind() == reflect.Array {
-				result = reflect.AppendSlice(result,
-					reflect.ValueOf(flat(v.Interface())))
+			if v.Kind() == reflect.Interface {
+				if v.Elem().Kind() == reflect.Slice || v.Elem().Kind() == reflect.Array {
+					result = reflect.AppendSlice(result,
+						reflect.ValueOf(flat(v.Interface())))
+				} else {
+					result = reflect.Append(result, v)
+				}
 			} else {
 				result = reflect.Append(result, v)
 			}
