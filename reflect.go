@@ -7,7 +7,6 @@ import (
 var derefCount int64 = 0
 var flatCount int64 = 0
 
-// Deref
 func deRef(i interface{}) interface{} {
 	if i == nil {
 		return i
@@ -25,22 +24,33 @@ func deRef(i interface{}) interface{} {
 func flat(i interface{}) []interface{} {
 	flatCount += 1
 
-	result := reflect.ValueOf([]interface{}{})
-
 	kindOfI := reflect.TypeOf(i).Kind()
-	valueOfI := reflect.ValueOf(i)
 
 	switch kindOfI {
-	case reflect.Ptr:
-		result = reflect.Append(result, reflect.ValueOf(i))
 	case reflect.Slice, reflect.Array:
+		valueOfI := reflect.ValueOf(i)
+
+		result := reflect.ValueOf(make([]interface{}, 0))
 		// Iterate the slice and flat each of them
 		for index := 0; index < valueOfI.Len(); index++ {
 			v := valueOfI.Index(index)
 			if v.Kind() == reflect.Interface {
-				if v.Elem().Kind() == reflect.Slice || v.Elem().Kind() == reflect.Array {
-					result = reflect.AppendSlice(result,
-						reflect.ValueOf(flat(v.Interface())))
+				vElem := v.Elem()
+				if vElem.Kind() == reflect.Slice || vElem.Kind() == reflect.Array {
+
+					for internalIndex := 0; internalIndex < vElem.Len(); internalIndex++ {
+						internalElem := v.Elem().Index(internalIndex)
+						eKind := internalElem.Kind()
+						if eKind == reflect.Interface && (
+							internalElem.Elem().Kind() == reflect.Slice ||
+							internalElem.Elem().Kind() == reflect.Array) {
+							result = reflect.AppendSlice(result,
+								reflect.ValueOf(flat(internalElem.Interface())))
+						} else {
+							result = reflect.Append(result,
+								reflect.ValueOf(internalElem.Interface()))
+						}
+					}
 				} else {
 					result = reflect.Append(result, v)
 				}
@@ -48,12 +58,11 @@ func flat(i interface{}) []interface{} {
 				result = reflect.Append(result, v)
 			}
 		}
+		back := result.Interface()
+		return back.([]interface{})
 	default:
-		result = reflect.Append(result, reflect.ValueOf(i))
+		return []interface{}{i}
 	}
-
-	back := result.Interface()
-	return back.([]interface{})
 }
 
 func assign(target interface{}, value interface{}) error {

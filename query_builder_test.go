@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"strconv"
+	"strings"
 )
 
 type TestFielder struct {
@@ -112,31 +114,42 @@ func TestJoin(t *testing.T) {
 
 func BenchmarkExp(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		expressions := make([]Expression, 1000)
-		for i := 0; i < 100; i++ {
+		expressions := make([]Expression, 0, 1000)
+		for i := 0; i < 1000; i++ {
 			x := make([]interface{}, 0, 10)
 			for j := 0; j < 10; j++ {
-				x = append(x, i * 10 + j)
+				x = append(x, strconv.Itoa(i * 10 + j))
 			}
 
-			expressions[i] = F("1, 2", x)
+			expressions = append(expressions, F("1, 2", P(x)))
 		}
 
-		Build( "SELECT abc, def FROM what",
-			"WHERE", Not(
-				And(
-					Exp("user_id >", P(12345)),
-					And(
-						Exp("media_id <", 12345),
-						Exp("time_uuid =", 12345),
-					),
-					F("1, 2",
-						expressions,
-					),
-				),
+		Build("SELECT abc, def FROM what",
+			"WHERE",
+			F("1, 2",
+				expressions,
 			),
 		)
+	}
+}
 
+func BenchmarkRawSprintfExp(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		expressions := make([]string, 0, 1000)
+		for i := 0; i < 1000; i++ {
+			for j := 0; j < 10; j++ {
+				expressions = append(expressions, strconv.Itoa(i * 10 + j))
+			}
+		}
+
+		questionMarks := strings.Repeat("?,", len(expressions))
+		questionMarks = questionMarks[0: len(questionMarks) - 1]
+
+		fmt.Sprintf(`SELECT abc, def FROM what
+				     WHERE NOT (
+				     	%s
+				     )`, questionMarks,
+		)
 	}
 }
 

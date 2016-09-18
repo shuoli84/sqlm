@@ -72,19 +72,19 @@ func Not(exp interface{}) Expression {
 // (1,2) => prefix:( sep:, suffix:)
 // 1,2  => prefix: sep:, suffix:
 // If the sep has three letters, then the first is prefix, last is suffix and middle is the sep
-func F(sepFormat string, expressions ...interface{}) Expression {
+func F(sepFormat string, components ...interface{}) Expression {
 	var prefix, sep, suffix string
 
-	components := strings.Split(sepFormat, "1")
-	prefix = components[0]
+	formatComponents := strings.Split(sepFormat, "1")
+	prefix = formatComponents[0]
 
-	secondHalfComponents := strings.Split(components[1], "2")
+	secondHalfComponents := strings.Split(formatComponents[1], "2")
 	sep = secondHalfComponents[0]
 	suffix = secondHalfComponents[1]
 
 	return formatter{
 		// When expression passed in as [[1,2,3]], we prefer it converts to [1,2,3]
-		expressions: componentsToExpressions(expressions),
+		expressions: componentsToExpressions(components),
 		prefix:      prefix,
 		sep:         sep,
 		suffix:      suffix,
@@ -102,7 +102,7 @@ func Build(expressions ...interface{}) (string, []interface{}) {
 //      Time => "?" args: "Time"
 func P(components ...interface{}) []Expression {
 	components = flat(components)
-	expressions := []Expression{}
+	expressions := make([]Expression, len(components))
 
 	for i := 0; i < len(components); i++ {
 		c := components[i]
@@ -117,7 +117,7 @@ func P(components ...interface{}) []Expression {
 			exp = NewRaw(fmt.Sprintf("%v", deRef(v)))
 		}
 
-		expressions = append(expressions, exp)
+		expressions[i] = exp
 	}
 	return expressions
 }
@@ -130,26 +130,32 @@ func Exp(components ...interface{}) Expression {
 // Apply to non-value sql expression. convert arbitrary types to string and arguments
 func componentsToExpressions(components []interface{}) []Expression {
 	expressions := []Expression{}
-	components = flat(components)
+	for _, component := range components {
+		if v, ok := component.([]Expression); ok {
+			expressions = append(expressions, v...)
+		} else {
+			flatted := flat(component)
 
-	for i := 0; i < len(components); i++ {
-		c := components[i]
+			for i := 0; i < len(flatted); i++ {
+				c := flatted[i]
 
-		var exp Expression
-		switch v := c.(type) {
-		case Expression:
-			exp = v
-		case string:
-			exp = NewRaw(v)
-		case *string:
-			exp = NewRaw(*v)
-		case []byte, time.Time, *[]byte, *time.Time:
-			exp = NewRaw("?", c)
-		default:
-			exp = NewRaw(fmt.Sprintf("%v", deRef(v)))
+				var exp Expression
+				switch v := c.(type) {
+				case Expression:
+					exp = v
+				case string:
+					exp = NewRaw(v)
+				case *string:
+					exp = NewRaw(*v)
+				case []byte, time.Time, *[]byte, *time.Time:
+					exp = NewRaw("?", c)
+				default:
+					exp = NewRaw(fmt.Sprintf("%v", deRef(v)))
+				}
+
+				expressions = append(expressions, exp)
+			}
 		}
-
-		expressions = append(expressions, exp)
 	}
 
 	return expressions
