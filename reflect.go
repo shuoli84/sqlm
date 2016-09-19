@@ -27,7 +27,8 @@ func flatInto(v reflect.Value, result reflect.Value) reflect.Value {
 
 	switch kindOfI {
 	case reflect.Slice, reflect.Array:
-		if v.Len() == 1 {
+		vLen := v.Len()
+		if vLen == 1 {
 			vItem := v.Index(0)
 			if vItem.Kind() == reflect.Interface {
 				vElem := vItem.Elem()
@@ -45,7 +46,7 @@ func flatInto(v reflect.Value, result reflect.Value) reflect.Value {
 			return result
 		}
 
-		for index := 0; index < v.Len(); index++ {
+		for index := 0; index < vLen; index++ {
 			vItem := v.Index(index)
 			if vItem.Kind() == reflect.Interface {
 				vElem := vItem.Elem()
