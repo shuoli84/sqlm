@@ -25,10 +25,10 @@ func NewRaw(sql string, arguments ...interface{}) Raw {
 	if len(arguments) == 0 {
 		return Raw{Sql: sql, Arguments: arguments}
 	} else if len(arguments) == 1 {
-		return Raw{Sql: sql, Arguments: flat(arguments[0])}
+		return Raw{Sql: sql, Arguments: flat([]interface{}{}, arguments[0])}
 	}
 
-	return Raw{Sql: sql, Arguments: flat(arguments)}
+	return Raw{Sql: sql, Arguments: flat([]interface{}{}, arguments)}
 }
 
 // formatter is a generic helper, which provide the way to join several expressions
@@ -43,13 +43,17 @@ type formatter struct {
 func (s formatter) ToSql() (string, []interface{}) {
 	sql := make([]string, len(s.expressions))
 	arguments := make([]interface{}, 0, len(s.expressions))
+
 	for i, expression := range s.expressions {
 		expSql, expArgs := expression.ToSql()
 		sql[i] = expSql
 		arguments = append(arguments, expArgs...)
 	}
 
-	return s.prefix + strings.Join(sql, s.sep) + s.suffix, arguments
+	sql[0] = s.prefix + sql[0]
+	sql[len(sql) - 1] = sql[len(sql) - 1] + s.suffix
+
+	return strings.Join(sql, s.sep), arguments
 }
 
 func G(components ...interface{}) Expression {
@@ -101,7 +105,7 @@ func Build(expressions ...interface{}) (string, []interface{}) {
 //      "what" => "?" args: "what"
 //      Time => "?" args: "Time"
 func P(components ...interface{}) []Expression {
-	components = flat(components)
+	components = flat([]interface{}{}, components)
 	expressions := make([]Expression, len(components))
 
 	for i := 0; i < len(components); i++ {
@@ -134,7 +138,7 @@ func componentsToExpressions(components []interface{}) []Expression {
 		if v, ok := component.([]Expression); ok {
 			expressions = append(expressions, v...)
 		} else {
-			flatted := flat(component)
+			flatted := flat(make([]interface{}, 0), component)
 
 			for i := 0; i < len(flatted); i++ {
 				c := flatted[i]

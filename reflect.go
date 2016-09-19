@@ -21,7 +21,54 @@ func deRef(i interface{}) interface{} {
 	}
 }
 
-func flat(i interface{}) []interface{} {
+// flat v into list, and return list value
+func flatInto(v reflect.Value, result reflect.Value) reflect.Value {
+	kindOfI := v.Kind()
+
+	switch kindOfI {
+	case reflect.Slice, reflect.Array:
+		if v.Len() == 1 {
+			vItem := v.Index(0)
+			if vItem.Kind() == reflect.Interface {
+				vElem := vItem.Elem()
+				vElemKind := vElem.Kind()
+				if vElemKind == reflect.Slice || vElemKind == reflect.Array {
+					for internalIndex := 0; internalIndex < vElem.Len(); internalIndex++ {
+						result = flatInto(vElem.Index(internalIndex), result)
+					}
+				} else {
+					result = reflect.Append(result, vItem)
+				}
+			} else {
+				result = reflect.Append(result, vItem)
+			}
+			return result
+		}
+
+		for index := 0; index < v.Len(); index++ {
+			vItem := v.Index(index)
+			if vItem.Kind() == reflect.Interface {
+				vElem := vItem.Elem()
+				if vElem.Kind() == reflect.Slice || vElem.Kind() == reflect.Array {
+					for internalIndex := 0; internalIndex < vElem.Len(); internalIndex++ {
+						internalElem := vItem.Elem().Index(internalIndex)
+						result = flatInto(internalElem, result)
+					}
+				} else {
+					result = reflect.Append(result, vItem)
+				}
+			} else {
+				result = reflect.Append(result, vItem)
+			}
+		}
+		return result
+	default:
+		result = reflect.Append(result, v)
+		return result
+	}
+}
+
+func flat(list []interface{}, i interface{}) []interface{} {
 	flatCount += 1
 
 	kindOfI := reflect.TypeOf(i).Kind()
@@ -29,39 +76,11 @@ func flat(i interface{}) []interface{} {
 	switch kindOfI {
 	case reflect.Slice, reflect.Array:
 		valueOfI := reflect.ValueOf(i)
-
-		result := reflect.ValueOf(make([]interface{}, 0))
-		// Iterate the slice and flat each of them
-		for index := 0; index < valueOfI.Len(); index++ {
-			v := valueOfI.Index(index)
-			if v.Kind() == reflect.Interface {
-				vElem := v.Elem()
-				if vElem.Kind() == reflect.Slice || vElem.Kind() == reflect.Array {
-
-					for internalIndex := 0; internalIndex < vElem.Len(); internalIndex++ {
-						internalElem := v.Elem().Index(internalIndex)
-						eKind := internalElem.Kind()
-						if eKind == reflect.Interface && (
-							internalElem.Elem().Kind() == reflect.Slice ||
-							internalElem.Elem().Kind() == reflect.Array) {
-							result = reflect.AppendSlice(result,
-								reflect.ValueOf(flat(internalElem.Interface())))
-						} else {
-							result = reflect.Append(result,
-								reflect.ValueOf(internalElem.Interface()))
-						}
-					}
-				} else {
-					result = reflect.Append(result, v)
-				}
-			} else {
-				result = reflect.Append(result, v)
-			}
-		}
-		back := result.Interface()
-		return back.([]interface{})
+		result := reflect.ValueOf(list)
+		result = flatInto(valueOfI, result)
+		return result.Interface().([]interface{})
 	default:
-		return []interface{}{i}
+		return append(list, i)
 	}
 }
 
