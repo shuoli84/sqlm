@@ -3,11 +3,11 @@ A minimalist sql builder
 
 # Motivation
 
-* Used and tired of ORM. It adds so many abstraction and you have to learn its paradim to do something non-trivial.
-* Getting tired of fmt.Sprintf of SQL, you have to put a %s and then append some value, or put a ? and counting the args number.
-* Composible, easily composed by table name, columns and arguments which defined at different places. 
+* Used and tired of ORM. It adds so many layers of abstraction and you have to learn its paradigm to do something non-trivial.
+* Getting tired of fmt.Sprintf of SQL, you have to put a %s and then append some value, or put a ? and count the number of args.
+* Composable, easily composed by table name, columns and arguments which are defined at different places. 
 
-So here comes sqlm, which just format sql, escape the arguments with the same structure as raw sql.
+So here comes sqlm, which just formats sql and escapes the arguments with the same structure as raw sql.
 
 ```Go
 // We should only retrieve columns asked by clients, so column list is passed in
