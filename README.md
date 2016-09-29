@@ -149,6 +149,9 @@ Group, alias to
 F("(1 2)"
 ```
 
+# Issues
+* Now when the parameter list is large, around 10000, it took around 10ms to build the sql and argument list. 
+
 # WAIT, where is the struct?
 Bind with struct is a nongoal for this lib. And also pls ignore the field_mapper.go. Will remove it in the future.
 
