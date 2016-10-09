@@ -43,8 +43,16 @@ func TestQueryBuilder(t *testing.T) {
 			),
 		).ToSql()
 
-		fmt.Println(sql)
-		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
+		expected := "SELECT abc, def FROM what " +
+			"WHERE NOT (user_id > 12345 AND " +
+			"(media_id < 12345 AND time_uuid = 12345) AND (media_id < 12345 AND time_uuid = 12345)" +
+			")"
+		if sql != expected {
+			panic(fmt.Errorf("Sql not matching real: %s expecting: %s", sql, expected))
+		}
+		if len(arguments) != 0 {
+			panic(fmt.Errorf("Argument length not right, should 0 but %d", len(arguments)))
+		}
 	}
 
 	{
@@ -60,8 +68,14 @@ func TestQueryBuilder(t *testing.T) {
 			"WHERE a =", P(300),
 		)
 
-		fmt.Println(sql)
-		fmt.Printf("len: %d, %v\n", len(arguments), arguments)
+		expected := "UPDATE table2 SET a = ?, \nb = ?, \nc = ?, \nd = 30 WHERE a = 300"
+
+		if sql != expected {
+			panic(fmt.Errorf("Sql not matching real: |%s|%d expecting: |%s|%d", sql, len(sql), expected, len(expected)))
+		}
+		if len(arguments) != 3 {
+			panic(fmt.Errorf("Argument length not right, should 3 but %d", len(arguments)))
+		}
 	}
 
 	{
