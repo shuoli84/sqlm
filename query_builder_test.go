@@ -24,6 +24,28 @@ func (t TestFielder) FieldForName(name string) interface{} {
 	}
 }
 
+func TestQuery(t *testing.T) {
+	sql, arguments := Build(
+		"UPDATE table2 SET",
+		F("1, \n2",
+			Exp("a =", P("300")),
+			Exp("b =", P("400")),
+			Exp("c =", P("500")),
+			Exp("d =", 30),
+		),
+		"WHERE a =", P(300),
+	)
+
+	expected := "UPDATE table2 SET a = ?, \nb = ?, \nc = ?, \nd = 30 WHERE a = 300"
+
+	if sql != expected {
+		panic(fmt.Errorf("Sql not matching real: |%s|%d expecting: |%s|%d", sql, len(sql), expected, len(expected)))
+	}
+	if len(arguments) != 3 {
+		panic(fmt.Errorf("Argument length not right, should 3 but %d", len(arguments)))
+	}
+}
+
 func TestQueryBuilder(t *testing.T) {
 	{
 		sql, arguments := Exp(
@@ -55,28 +77,7 @@ func TestQueryBuilder(t *testing.T) {
 		}
 	}
 
-	{
-		i := 30
-		sql, arguments := Build(
-			"UPDATE table2 SET",
-			F("1, \n2",
-				Exp("a =", P("300")),
-				Exp("b =", P("400")),
-				Exp("c =", P("500")),
-				Exp("d =", i),
-			),
-			"WHERE a =", P(300),
-		)
 
-		expected := "UPDATE table2 SET a = ?, \nb = ?, \nc = ?, \nd = 30 WHERE a = 300"
-
-		if sql != expected {
-			panic(fmt.Errorf("Sql not matching real: |%s|%d expecting: |%s|%d", sql, len(sql), expected, len(expected)))
-		}
-		if len(arguments) != 3 {
-			panic(fmt.Errorf("Argument length not right, should 3 but %d", len(arguments)))
-		}
-	}
 
 	{
 		table := "tablename"

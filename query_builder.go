@@ -96,7 +96,7 @@ func F(sepFormat string, components ...interface{}) Expression {
 }
 
 func Build(expressions ...interface{}) (string, []interface{}) {
-	sql, args := Exp(expressions).ToSql()
+	sql, args := Exp(expressions...).ToSql()
 	return sql, args
 }
 
@@ -128,7 +128,7 @@ func P(components ...interface{}) []Expression {
 
 // Exp("SELECT", "a, b", "FROM", tableName) => "SELECT a, b FROM table". Use space to join all expressions
 func Exp(components ...interface{}) Expression {
-	return F("1 2", components)
+	return F("1 2", components...)
 }
 
 // Apply to non-value sql expression. convert arbitrary types to string and arguments
